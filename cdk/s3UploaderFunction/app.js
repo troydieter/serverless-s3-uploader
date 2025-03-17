@@ -30,7 +30,7 @@ const getUploadURL = async function(event) {
   }
 
   const actionId = crypto.randomUUID() // Generates a unique file name
-  const contentType = event?.queryStringParameters?.contentType || 'image/jpeg'
+  const contentType = event?.queryStringParameters?.contentType || 'application/octet-stream';
 
   const s3Params = {
     Bucket: process.env.UploadBucket,
