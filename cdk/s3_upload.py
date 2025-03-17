@@ -44,17 +44,11 @@ class S3UploaderStack(Stack):
             ]
         )
 
-        s3_bucket.add_to_resource_policy(
+        lambda_role.add_to_policy(
             iam.PolicyStatement(
-                actions=["s3:PutObject"],
-                resources=[f"{s3_bucket.bucket_arn}/*"],
-                principals=[iam.AnyPrincipal()],
-                conditions={
-                    "StringLike": {
-                        # Allows any MIME type
-                        "s3:RequestObjectTag/content-type": ["*/*"]
-                    }
-                }
+                actions=["s3:PutObject", "s3:GetObject",
+                         "s3:DeleteObject", "s3:ListBucket"],
+                resources=[s3_bucket.bucket_arn, f"{s3_bucket.bucket_arn}/*"]
             )
         )
 
