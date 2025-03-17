@@ -1,54 +1,60 @@
-/*
-  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-  Permission is hereby granted, free of charge, to any person obtaining a copy of this
-  software and associated documentation files (the "Software"), to deal in the Software
-  without restriction, including without limitation the rights to use, copy, modify,
-  merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
-  permit persons to whom the Software is furnished to do so.
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-  INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-  PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-  HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-  OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 'use strict'
 
-const AWS = require('aws-sdk')
-AWS.config.update({ region: process.env.AWS_REGION || 'us-east-1' })
-const s3 = new AWS.S3()
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3')
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
+const crypto = require('crypto')
+require('dotenv').config() // Enables .env support for local testing
+
+// Initialize S3 Client
+const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' })
 
 // Main Lambda entry point
 exports.handler = async (event) => {
-  const result = await getUploadURL()
-  console.log('Result: ', result)
-  return result
+  try {
+    const result = await getUploadURL(event)
+    console.log('Generated Upload URL:', result)
+    return result
+  } catch (error) {
+    console.error('Error generating upload URL:', error)
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Internal Server Error' }),
+      headers: { 'Access-Control-Allow-Origin': '*' }
+    }
+  }
 }
 
-const getUploadURL = async function() {
-  const actionId = parseInt(Math.random()*10000000)
-  
-  const s3Params = {
-    Bucket: process.env.UploadBucket,
-    Key:  `${actionId}.jpg`,
-    ContentType: 'image/jpeg' // Update to match whichever content type you need to upload
-    //ACL: 'public-read'      // Enable this setting to make the object publicly readable - only works if the bucket can support public objects
+const getUploadURL = async function(event) {
+  if (!process.env.UploadBucket) {
+    throw new Error('Missing required environment variable: UploadBucket')
   }
 
-  console.log('getUploadURL: ', s3Params)
-  return new Promise((resolve, reject) => {
-    // Get signed URL
-    resolve({
-      "statusCode": 200,
-      "isBase64Encoded": false,
-      "headers": {
-        "Access-Control-Allow-Origin": "*"
-      },
-      "body": JSON.stringify({
-          "uploadURL": s3.getSignedUrl('putObject', s3Params),
-          "photoFilename": `${actionId}.jpg`
+  const actionId = crypto.randomUUID() // Generates a unique file name
+  const contentType = event?.queryStringParameters?.contentType || 'image/jpeg'
+
+  const s3Params = {
+    Bucket: process.env.UploadBucket,
+    Key: `${actionId}.jpg`,
+    ContentType: contentType
+  }
+
+  console.log('S3 Params:', s3Params)
+
+  try {
+    const command = new PutObjectCommand(s3Params)
+    const uploadURL = await getSignedUrl(s3, command, { expiresIn: 300 }) // 5-minute expiration
+
+    return {
+      statusCode: 200,
+      isBase64Encoded: false,
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({
+        uploadURL,
+        photoFilename: `${actionId}.jpg`
       })
-    })
-  })
+    }
+  } catch (error) {
+    console.error('Error generating signed URL:', error)
+    throw error
+  }
 }

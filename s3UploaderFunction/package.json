@@ -1,15 +1,21 @@
 {
   "name": "form-handler",
   "version": "1.0.0",
-  "description": "",
+  "description": "Serverless function to generate S3 pre-signed upload URLs",
   "main": "app.js",
   "scripts": {
+    "start": "node app.js",
+    "lint": "eslint .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "James Beswick, Amazon Web Services",
+  "keywords": ["aws", "s3", "lambda", "serverless"],
+  "author": "James Beswick and Troy Dieter, Amazon Web Services",
   "license": "MIT",
   "dependencies": {
-    "aws-sdk": "^2.714.0"
+    "@aws-sdk/client-s3": "^3.500.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.56.0"
   }
 }
